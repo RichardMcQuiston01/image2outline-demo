@@ -4,13 +4,13 @@ import type {
   OutputFormat,
 } from "@richardmcquiston01/makertool-image2outline";
 import { NextResponse } from "next/server";
+import { MAX_IMAGE_BYTES } from "@/lib/constants";
 
 // `image2outline` decodes images with `sharp`, a native addon that only
 // runs in a Node.js server runtime, not on the Edge — this route must stay
 // on Node.
 export const runtime = "nodejs";
 
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const VALID_FORMATS: readonly OutputFormat[] = ["svg", "dxf"];
 const VALID_UNITS = ["mm", "in"] as const;
 

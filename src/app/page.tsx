@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ImageDropzone } from "@/components/ImageDropzone";
 import { OutlineResults } from "@/components/OutlineResults";
 import { TraceOptionsForm } from "@/components/TraceOptionsForm";
+import { MAX_IMAGE_BYTES } from "@/lib/constants";
 import { traceImage } from "@/lib/traceClient";
 import type { OutlineResult, TraceRequestOptions } from "@/lib/types";
 
@@ -38,6 +39,16 @@ function validateOptions(options: TraceRequestOptions): string | null {
   return null;
 }
 
+function validateFile(file: File): string | null {
+  if (!file.type.startsWith("image/")) {
+    return `"${file.name}" isn't an image file. Choose a PNG, JPEG, or similar.`;
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    return `"${file.name}" is ${(file.size / 1024 / 1024).toFixed(1)} MB, which is over the ${MAX_IMAGE_BYTES / 1024 / 1024} MB limit.`;
+  }
+  return null;
+}
+
 export default function Home(): React.JSX.Element {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -45,28 +56,62 @@ export default function Home(): React.JSX.Element {
   const [result, setResult] = useState<OutlineResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isTracing, setIsTracing] = useState<boolean>(false);
+  const resultSectionRef = useRef<HTMLElement>(null);
 
-  const handleFileSelected = useCallback((file: File): void => {
-    setSelectedFile(file);
+  useEffect(() => {
+    if (result) {
+      resultSectionRef.current?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth",
+        block: "start",
+      });
+    }
+  }, [result]);
+
+  const clearFile = useCallback(() => {
+    setSelectedFile(null);
     setResult(null);
-    setErrorMessage(null);
     setPreviewUrl((existingUrl) => {
       if (existingUrl) {
         URL.revokeObjectURL(existingUrl);
       }
-      return URL.createObjectURL(file);
+      return null;
     });
   }, []);
 
-  const handleSubmit = useCallback(async (): Promise<void> => {
-    if (!selectedFile) {
-      setErrorMessage("Choose an image to trace first.");
-      return;
-    }
+  const handleFileSelected = useCallback(
+    (file: File): void => {
+      const fileError = validateFile(file);
+      if (fileError) {
+        setErrorMessage(fileError);
+        return;
+      }
 
-    const validationError = validateOptions(options);
-    if (validationError) {
-      setErrorMessage(validationError);
+      setSelectedFile(file);
+      setResult(null);
+      setErrorMessage(null);
+      setPreviewUrl((existingUrl) => {
+        if (existingUrl) {
+          URL.revokeObjectURL(existingUrl);
+        }
+        return URL.createObjectURL(file);
+      });
+    },
+    [],
+  );
+
+  const handleClear = useCallback((): void => {
+    setErrorMessage(null);
+    clearFile();
+  }, [clearFile]);
+
+  const blockingReason = !selectedFile
+    ? "Choose an image to trace first."
+    : validateOptions(options);
+
+  const handleSubmit = useCallback(async (): Promise<void> => {
+    if (!selectedFile || blockingReason) {
       return;
     }
 
@@ -84,7 +129,7 @@ export default function Home(): React.JSX.Element {
     } finally {
       setIsTracing(false);
     }
-  }, [selectedFile, options]);
+  }, [selectedFile, options, blockingReason]);
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-10 px-6 py-16">
@@ -111,29 +156,61 @@ export default function Home(): React.JSX.Element {
           selectedFile={selectedFile}
           previewUrl={previewUrl}
           onFileSelected={handleFileSelected}
+          onCleared={handleClear}
+          disabled={isTracing}
         />
 
-        <TraceOptionsForm options={options} onChange={setOptions} />
+        <TraceOptionsForm
+          options={options}
+          onChange={setOptions}
+          disabled={isTracing}
+        />
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={isTracing || !selectedFile}
-            className="rounded-full bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-zinc-300 dark:disabled:bg-zinc-700"
+            disabled={isTracing || Boolean(blockingReason)}
+            className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-zinc-300 dark:disabled:bg-zinc-700"
           >
+            {isTracing ? (
+              <svg
+                className="h-4 w-4 animate-spin text-white/80"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z"
+                />
+              </svg>
+            ) : null}
             {isTracing ? "Tracing…" : "Trace outline"}
           </button>
           {errorMessage ? (
             <p role="alert" className="text-sm text-red-600 dark:text-red-400">
               {errorMessage}
             </p>
+          ) : blockingReason ? (
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              {blockingReason}
+            </p>
           ) : null}
         </div>
       </section>
 
       {result ? (
-        <section className="flex flex-col gap-4">
+        <section ref={resultSectionRef} className="flex scroll-mt-6 flex-col gap-4">
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
             Result
           </h2>

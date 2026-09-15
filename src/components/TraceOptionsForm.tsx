@@ -6,6 +6,7 @@ import type { OutputFormat } from "@richardmcquiston01/makertool-image2outline";
 export interface TraceOptionsFormProps {
   readonly options: TraceRequestOptions;
   readonly onChange: (options: TraceRequestOptions) => void;
+  readonly disabled?: boolean;
 }
 
 const ALL_FORMATS: readonly OutputFormat[] = ["svg", "dxf"];
@@ -24,9 +25,13 @@ function toggleFormat(
 export function TraceOptionsForm({
   options,
   onChange,
+  disabled = false,
 }: TraceOptionsFormProps): React.JSX.Element {
   return (
-    <div className="flex flex-col gap-6">
+    <fieldset
+      disabled={disabled}
+      className="flex flex-col gap-6 disabled:opacity-60"
+    >
       <fieldset>
         <legend className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
           Output formats
@@ -144,7 +149,7 @@ export function TraceOptionsForm({
         />
         Flip Y (CAD convention: Y up, origin bottom-left)
       </label>
-    </div>
+    </fieldset>
   );
 }
 
