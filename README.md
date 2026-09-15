@@ -29,7 +29,7 @@ uploaded image to a server API route (`/api/trace`), which runs
 
 ### Prerequisites
 
-- Node.js 18 or later
+- Node.js 20.9 or later (required by Next.js 16)
 
 ### Installation
 
